@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icap-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: icap-receiver
+  template:
+    metadata:
+      labels:
+        app: icap-receiver
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: icap-receiver
+        image: ghcr.io/skyhighsecurity/icap-receiver:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 1344
+        env:
+        - name: GAM_USER
+          value: "testing"
+        - name: GAM_PASSWORD
+          value: "testing"
+        - name: GAM_HOST
+          value: "gamapi"

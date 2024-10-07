@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gamapi-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gamapi
+  template:
+    metadata:
+      labels:
+        app: gamapi
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: gamapi
+        image: ghcr.io/skyhighsecurity/gamapi:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: gam-product-conf
+          mountPath: "/gam/gam-product.conf"
+          subPath: "gam-product.conf"
+        - name: gam-updates
+          mountPath: "/updates"
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AIRGAPPED
+          value: "true"
+        - name: APIUSERNAME
+          value: "testing"
+        - name: APIUSERPASSWORD
+          value: "testing"
+      volumes:
+      - name: gam-product-conf
+        secret:
+          secretName: gam-product-secret
+      - name: gam-updates
+        persistentVolumeClaim:
+          claimName: gam-updates

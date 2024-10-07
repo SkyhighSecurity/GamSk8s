@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gamapi
+  name: gamapi
+spec:
+  ports:
+    - name: "8080"
+      port: 8080
+  selector:
+    app: gamapi

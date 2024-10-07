@@ -1,0 +1,19 @@
+# Ignore Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment files
+env/
+.venv/
+*.env
+
+# Ignore Docker-related files
+*.log
+*.tmp
+
+# Ignore Kubernetes manifests' secrets (if any)
+*.secret.yaml
+
+# Ignore temp files
+tmp/

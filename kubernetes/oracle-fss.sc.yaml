@@ -1,0 +1,9 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: oracle-fss
+provisioner: fss.csi.oraclecloud.com
+parameters:
+  availabilityDomain: YpPp:US-CHICAGO-1-AD-1
+  mountTargetSubnetOcid: ocid1.subnet.oc1.us-chicago-1.aaaaaaaaupwmp7hgeute7kh6hzidvufmdgvxac2r55jq2vk27tfvgcprzc5q
+  encryptInTransit: "false"
