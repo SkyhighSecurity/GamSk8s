@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gam-manager-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gam-manager
+  template:
+    metadata:
+      labels:
+        app: gam-manager
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: gam-manager
+        image: ghcr.io/skyhighsecurity/gamsk8s-manager:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+        env:
+        - name: GAM_HOST
+          value: "gamapi"
+        - name: GAM_PORT
+          value: "8080"
+        - name: GAM_USER
+          value: "testing"
+        - name: GAM_PASSWORD
+          value: "testing"
+        - name: GAM_MALWARE_THRESHOLD
+          value: "60"
+        - name: EXTRACT_PATH
+          value: "/tmp/extracted_files"

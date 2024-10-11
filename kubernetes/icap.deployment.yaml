@@ -16,7 +16,7 @@ spec:
       - name: regcred
       containers:
       - name: icap-receiver
-        image: ghcr.io/skyhighsecurity/icap-receiver:latest
+        image: ghcr.io/skyhighsecurity/gamsk8s-icap:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 1344
@@ -25,5 +25,7 @@ spec:
           value: "testing"
         - name: GAM_PASSWORD
           value: "testing"
-        - name: GAM_HOST
-          value: "gamapi"
+        - name: GAM_MANAGER_HOST
+          value: "gam-manager"
+        - name: GAM_MANAGER_PORT
+          value: "5000"

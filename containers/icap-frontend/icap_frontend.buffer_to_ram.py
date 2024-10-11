@@ -1,18 +1,16 @@
 from pyicap import ICAPServer, BaseICAPRequestHandler
 import socketserver
-import os
 import json
-import magic
 import requests
 import logging
-import base64
+import os
 from requests_toolbelt.multipart.encoder import MultipartEncoder
-from archive_extraction import extract_archive
 
 # Set up temporary values to be passed later
-GAM_BACKEND_URL = "http://gamapi:8080"
-GAM_AUTH = ("testing", "testing")
-GAM_MALWARE_THRESHOLD = 60
+GAM_MANAGER_HOST = os.getenv('GAM_MANAGER_HOST', 'localhost')
+GAM_MANAGER_PORT = os.getenv('GAM_MANAGER_PORT', '5000')
+GAM_MANAGER_URL = f"http://{GAM_MANAGER_HOST}:{GAM_MANAGER_PORT}/scan"
+
 
 # Set up basic logging
 logging.basicConfig(level=logging.DEBUG)
@@ -115,21 +113,25 @@ class ICAPHandler(BaseICAPRequestHandler):
             self.no_adaptation_required()
             return
 
+        http_request = self.enc_req
+        method, url, version = http_request
+        filename = os.path.basename(url)
+        logging.info(f"Processing file: {filename}")
+
         request_data = self.read_file_from_request()
-        
+
         if request_data:
             logging.info(f"Received request data of size: {len(request_data)} bytes")
             
-            # Call scan_file_with_gam to scan the file
-            api_response = scan_file_with_gam(request_data, "scanned_file")
-
-            # Check if the file is infected based on the new criteria using GAM_MALWARE_THRESHOLD
-            malware_name = api_response.get('MalwareName')
-            malware_probability = api_response.get('MalwareProbability', 0)
-
-            if malware_name or malware_probability > GAM_MALWARE_THRESHOLD:
-                logging.info(f"File is infected. MalwareName: {malware_name}, Probability: {malware_probability}")
-                
+            # Call scan_with_manager to scan the file
+            api_response = scan_with_manager(request_data, filename)
+###
+            # Check for infected files
+            logging.info(f"api_response: {api_response}")
+            infected_files = api_response.get('infected_files', '')
+            
+            if infected_files:
+                # Infected files were found
                 # Respond with ICAP 403 and encapsulate the JSON response in the body
                 self.set_icap_response(403)  # Forbidden if the file is infected
                 self.set_enc_status(b'HTTP/1.1 403 Forbidden')  # Use bytes for status
@@ -139,15 +141,21 @@ class ICAPHandler(BaseICAPRequestHandler):
 
                 # Convert the API response to JSON string
                 json_response = json.dumps(api_response)
-                logging.debug(f"Encapsulating GAM response: {json_response}")
+                logging.debug(f"Encapsulating GAM-Manager response: {json_response}")
                 
                 # Encapsulate the JSON response using write_chunk
                 self.write_chunk(json_response.encode('utf-8'))
                 self.write_chunk(b'')  # Empty chunk to signal the end of the body
+
             else:
+                # No infected files were found
+                logging.info(f"No infected files found for {filename}")
                 logging.info("File is clean. Returning ICAP 204 (No Adaptation Required).")
                 self.no_adaptation_required()
-                return  # Ensure no further code is executed after no_adaptation_required
+
+
+###
+
 
     def reqmod_OPTIONS(self):
         """
@@ -197,72 +205,39 @@ def run_server():
     icap_server = ThreadedICAPServer(server_address, ICAPHandler)
     icap_server.serve_forever()
 
-def encode_base64(content):
+def scan_with_manager(file_data, file_name):
     """
-    Encodes the given content to base64 format.
-    """
-    return base64.b64encode(content.encode('utf-8')).decode('utf-8')
-
-def scan_file_with_gam(file_data, file_name):
-    """
-    Sends a file to the GAM backend scanning service for malware scanning.
+    Sends a file to the middle layer API to check if it contains any infected files.
+    
     Args:
-        file_data: The binary data of the file to be scanned.
-        file_name: The name of the file.
-    
-    Returns:
-        The scan result returned by the GAM backend service.
-    """
-    # Ensure that the file_data is in binary format
-    if isinstance(file_data, int):
-        raise ValueError("file_data is expected to be binary, not an integer")
-
-    # Use only the file name in the SourceURL and base64 encode it
-    source_url = f"http://0/file/{file_name}"
-    encoded_source_url = encode_base64(source_url)
-
-    # Prepare the metadata and file content for scanning, with the base64-encoded SourceURL
-    metadata = json.dumps({"SourceURL": encoded_source_url})
-    scan_request = {
-        "meta": ("meta.json", metadata, "application/json"),  # Ensure metadata is a string
-        "body": (file_name, file_data, "application/octet-stream")  # Ensure file_data is binary
-    }
-
-    encoder = MultipartEncoder(fields=scan_request)
-    
-    headers = {
-        'Content-Type': encoder.content_type,
-    }
-
-    # Log the details of the request being sent
-    logging.info(f"Sending file '{file_name}' to GAM backend for scanning.")
-    logging.debug(f"Request headers: {headers}")
-    logging.debug(f"File metadata: {metadata}")
-    
-    # Submit the request to the GAM backend
-    try:
-        response = requests.post(
-            f"{GAM_BACKEND_URL}/GAMScanServer/v1/scans",
-            data=encoder,
-            headers=headers,
-            auth=GAM_AUTH,  # Add basic authentication
-            verify=False  # You can disable SSL verification with verify=False, though not recommended
-        )
-        response.raise_for_status()
+        file_name: The name of the file being scanned.
+        file_data: The binary content of the file being scanned.
         
-        # Log the response details
-        logging.info(f"Received response from GAM backend with status code: {response.status_code}")
-        logging.debug(f"Response content: {response.text}")
+    Returns:
+        A json result from the gam-backend
+    """
+    try:
 
-        # Parse and return the scan result
+        logging.info(f"Scan with manager filename: {file_name}")
+        logging.info(f"Scan with manager filedata: {file_data}")
+
+
+        # Prepare the file for the request
+        files = {'file': (file_name, file_data, 'application/octet-stream')}
+        
+        # Send the file to the middle layer for scanning
+        response = requests.post(GAM_MANAGER_URL, files=files)
+        response.raise_for_status()  # Raise an exception for any HTTP errors
+        
+        # Log and parse the response
         scan_result = response.json()
-        logging.debug(f"Scan result: {scan_result}")
+        logging.info(f"Received scan result: {scan_result}")
+        
         return scan_result
 
     except requests.RequestException as e:
-        logging.error(f"Error sending file to backend for scanning: {str(e)}")
-        logging.debug(f"Request details: File name={file_name}, Headers={headers}, Encoder={encoder}")
-        return {'error': str(e)}
+        logging.error(f"Error scanning file {file_name}: {str(e)}")
+        return False, None
 
 if __name__ == "__main__":
     run_server()

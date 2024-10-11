@@ -22,8 +22,5 @@ COPY . .
 # Expose the ICAP port
 EXPOSE 1344
 
-# Set environment variables (optional, can be passed dynamically)
-ENV DOWNSTREAM_API=http://downstream-api:8080
-
 # Run the ICAP service
-CMD ["python", "icap_service.py"]
+CMD ["python", "icap_frontend.py"]

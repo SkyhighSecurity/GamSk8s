@@ -7,6 +7,10 @@ import zipfile
 import tarfile
 import shutil
 import requests
+import base64
+import magic  # Use magic to detect file type
+import pycdlib  # For ISO extraction
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
@@ -14,6 +18,14 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 # Set default environment variables
+GAM_HOST = os.getenv('GAM_HOST', 'localhost')
+GAM_PORT = os.getenv('GAM_PORT', '8080')
+GAM_BACKEND = f"http://{GAM_HOST}:{GAM_PORT}"
+
+GAM_USER = os.getenv('GAM_USER', 'testing')
+GAM_PASSWORD = os.getenv('GAM_PASSWORD',  'testing')
+GAM_AUTH = (GAM_USER, GAM_PASSWORD)
+
 GAM_MALWARE_THRESHOLD = int(os.getenv('GAM_MALWARE_THRESHOLD', 60))
 EXTRACT_PATH = os.getenv('EXTRACT_PATH', '/tmp')
 
@@ -26,21 +38,51 @@ def extract_archive(file_path, extract_to):
     total_size = 0
     extracted_files = []
 
-    if zipfile.is_zipfile(file_path):
+    # Use magic to identify the file type based on content
+    file_type = magic.from_file(file_path, mime=True)
+
+    # Handle ZIP files
+    if file_type == 'application/zip':
         with zipfile.ZipFile(file_path, 'r') as archive:
             archive.extractall(extract_to)
             extracted_files = archive.namelist()
-    elif tarfile.is_tarfile(file_path):
+    # Handle TAR files (compressed or uncompressed)
+    elif file_type in ['application/x-tar', 'application/gzip', 'application/x-bzip2', 'application/x-xz']:
         with tarfile.open(file_path, 'r:*') as archive:
             archive.extractall(extract_to)
             extracted_files = archive.getnames()
-
+    # Handle ISO files
+    elif file_type == 'application/x-iso9660-image':
+        with pycdlib.PyCdlib() as iso:
+            iso.open(file_path)
+            iso_path = tempfile.mkdtemp(dir=extract_to)
+            extract_iso(iso, iso_path)
+            extracted_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(iso_path) for f in fn]
+    
     # Calculate the total number of files and bytes extracted
     for extracted_file in extracted_files:
         total_files += 1
         total_size += os.path.getsize(os.path.join(extract_to, extracted_file))
 
     return total_files, total_size, extracted_files
+
+# Function to extract files from an ISO image
+def extract_iso(iso, extract_to):
+    for p in iso.list_children('/'):
+        iso_file = p.fileid.decode('utf-8').strip()
+        out_file = os.path.join(extract_to, iso_file)
+        
+        if p.is_file():
+            iso.get_file_from_iso_fp(out_file, iso_path=iso_file)
+        elif p.is_dir():
+            os.makedirs(out_file, exist_ok=True)
+            extract_iso(iso, out_file)
+
+def encode_base64(content):
+    """
+    Encodes the given content to base64 format.
+    """
+    return base64.b64encode(content.encode('utf-8')).decode('utf-8')
 
 # Utility function to scan a file using GAM backend
 def scan_file_with_gam(file_data, file_name):
@@ -58,7 +100,7 @@ def scan_file_with_gam(file_data, file_name):
 
     try:
         response = requests.post(
-            f"{GAM_BACKEND_URL}/GAMScanServer/v1/scans",
+            f"{GAM_BACKEND}/GAMScanServer/v1/scans",
             data=encoder,
             headers=headers,
             auth=GAM_AUTH,
@@ -91,9 +133,10 @@ def scan_file():
     total_size = 0
     extracted_files = []
     infected_files = []
-    not_infected_files = []
-
-    if zipfile.is_zipfile(file_path) or tarfile.is_tarfile(file_path):
+    
+    # Identify file type based on content, not extension
+    file_type = magic.from_file(file_path, mime=True)
+    if file_type in ['application/zip', 'application/x-tar', 'application/gzip', 'application/x-bzip2', 'application/x-xz', 'application/x-iso9660-image']:
         start_time = time.time()
         extract_to = tempfile.mkdtemp(dir=EXTRACT_PATH)
         total_files, total_size, extracted_files = extract_archive(file_path, extract_to)
@@ -102,25 +145,27 @@ def scan_file():
         # Scan each extracted file
         for extracted_file in extracted_files:
             full_path = os.path.join(extract_to, extracted_file)
-            with open(full_path, 'rb') as f:
-                file_data = f.read()
-                scan_result = scan_file_with_gam(file_data, extracted_file)
 
-                malware_name = scan_result.get('MalwareName')
-                malware_probability = scan_result.get('MalwareProbability', 0)
-                if malware_name or malware_probability > GAM_MALWARE_THRESHOLD:
-                    infected_files.append({
-                        "file": extracted_file,
-                        "malware_name": malware_name,
-                        "malware_probability": malware_probability
-                    })
-                else:
-                    not_infected_files.append(extracted_file)
+            if os.path.isfile(full_path):
+                with open(full_path, 'rb') as f:
+                    file_data = f.read()
+                    scan_result = scan_file_with_gam(file_data, extracted_file)
+
+                    malware_name = scan_result.get('MalwareName')
+                    malware_probability = scan_result.get('MalwareProbability', 0)
+                    if malware_name and malware_probability > GAM_MALWARE_THRESHOLD:
+                        infected_files.append({
+                            "file": extracted_file,
+                            "malware_name": malware_name,
+                            "malware_probability": malware_probability
+                        })
+            else:
+                print(f"Skipping directory entry: {full_path}")
 
         shutil.rmtree(extract_to)
         elapsed_time = time.time() - start_time
         logging.info(f"Scanned archive {filename} in {elapsed_time:.2f} seconds: "
-                     f"{len(infected_files)} infected, {len(not_infected_files)} clean")
+                     f"{len(infected_files)} infected out of {total_files}")
 
     else:
         # If the file is not an archive, scan it directly
@@ -130,22 +175,19 @@ def scan_file():
 
             malware_name = scan_result.get('MalwareName')
             malware_probability = scan_result.get('MalwareProbability', 0)
-            if malware_name or malware_probability > GAM_MALWARE_THRESHOLD:
+            if malware_name and malware_probability > GAM_MALWARE_THRESHOLD:
                 infected_files.append({
                     "file": filename,
                     "malware_name": malware_name,
                     "malware_probability": malware_probability
                 })
-            else:
-                not_infected_files.append(filename)
 
     # Return the results
     return jsonify({
         "infected_files": infected_files,
-        "not_infected_files": not_infected_files,
         "total_infected": len(infected_files),
-        "total_clean": len(not_infected_files)
+        "not_infected": (total_files - len(infected_files))
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

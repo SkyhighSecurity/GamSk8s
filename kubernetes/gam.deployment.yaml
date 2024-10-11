@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: gamapi-deployment
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: gamapi
@@ -16,7 +16,7 @@ spec:
       - name: regcred
       containers:
       - name: gamapi
-        image: ghcr.io/skyhighsecurity/gamapi:latest
+        image: ghcr.io/skyhighsecurity/gamsk8s-gam:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: gam-product-conf
