@@ -2,6 +2,7 @@ ARG BASE_IMAGE=redhat/ubi9
 ARG BASE_TAG=9.4
 
 FROM ${BASE_IMAGE}:${BASE_TAG}
+LABEL org.opencontainers.image.source https://github.com/skyhighsecurity/gamsk8s
 
 WORKDIR /
 

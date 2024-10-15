@@ -1,6 +1,6 @@
 # Use an official Python runtime as a parent image
 FROM python:3.9-slim
-
+LABEL org.opencontainers.image.source https://github.com/skyhighsecurity/gamsk8s
 # Set environment variables
 ENV GAM_MALWARE_THRESHOLD=60
 

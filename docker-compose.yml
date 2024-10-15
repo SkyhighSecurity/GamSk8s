@@ -30,7 +30,6 @@ services:
     networks:
       - gam-network
 
-services:
   gam-worker:
     image: ghcr.io/skyhighsecurity/gamsk8s/gam-worker:latest
     build:

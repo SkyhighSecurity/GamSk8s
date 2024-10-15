@@ -1,5 +1,6 @@
 # Use the official Python image from Docker Hub
 FROM python:3.9-slim
+LABEL org.opencontainers.image.source https://github.com/skyhighsecurity/gamsk8s
 
 # Install system dependencies for file type detection and archive extraction
 RUN apt-get update && apt-get install -y \
