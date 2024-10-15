@@ -53,13 +53,12 @@ The following ASCII diagram depicts how the components of GamSk8s interact to sc
 - Acts as the middleware between listeners and the scanning engine.
 - Handles incoming requests, unpacks archives, and distributes individual files to Gam-Workers for scanning.
 - Manages communication and load balancing between listeners and workers.
-- Requires a product license from Skyhigh Security and agreement with the terms in containers/gam-worker/README.md
 
 ### 3. **Gam-Worker**
 
 - Consists of the proprietary **Skyhigh Gateway AntiMalware (GAM)** engine.
 - Hosts a lightweight REST API that scans individual files.
-- Requires a valid license to run.
+- Requires a valid license from Skyhigh Security and agreement with the terms in containers/gam-worker/README.md
 
 ## Features
 
