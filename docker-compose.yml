@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  icap-listener:
+    image: icap-listener:latest
+    build:
+      context: ./containers/icap-listener
+      dockerfile: Dockerfile
+    ports:
+      - "1344:1344"
+    environment:
+      - MANAGER_SERVICE_URL=http://gam-manager:8000
+    networks:
+      - gam-network
+
+  gam-manager:
+    image: gam-manager:latest
+    build:
+      context: ./containers/gam-manager
+      dockerfile: Dockerfile
+    ports:
+      - "500:8000"
+    environment:
+      - WORKER_SERVICE_URL=http://gam-worker:9000
+    volumes:
+      - gam-updates:/shared-storage
+    networks:
+      - gam-network
+
+  gam-worker:
+    image: gam-worker:latest
+    build:
+      context: ./containers/gam-worker
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      - LICENSE_PATH=/shared-storage/license.key
+    volumes:
+      - gam-updates:/shared-storage
+    networks:
+      - gam-network
+
+networks:
+  gam-network:
+    driver: bridge
+
+volumes:
+  gam-updates:
+    driver: local

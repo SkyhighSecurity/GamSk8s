@@ -1,4 +1,3 @@
-
 # ICAP Listener Service
 
 This service provides an ICAP interface that allows clients to send files for processing. The files are streamed to the GAM-Manager service which extract files and distributes load to GAM workers.

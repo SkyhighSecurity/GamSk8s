@@ -16,7 +16,7 @@ spec:
       - name: regcred
       containers:
       - name: gam-manager
-        image: ghcr.io/skyhighsecurity/gam-manager:latest
+        image: ghcr.io/skyhighsecurity/gamsk8s/gam-manager:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5000

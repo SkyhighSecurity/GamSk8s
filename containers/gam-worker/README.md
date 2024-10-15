@@ -1,5 +1,6 @@
+# GAM-worker
 
-This project exposes Skyhigh Gateway AntiMalware (GAM) services through a REST API.  These services include file reputation, signature analysis, and emulation.
+The GAM-worker component exposes Skyhigh Gateway AntiMalware (GAM) services through a REST API. These services include file reputation, signature analysis, and emulation.
 
 # Prerequisites
 
