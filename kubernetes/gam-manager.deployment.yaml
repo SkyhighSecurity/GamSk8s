@@ -12,8 +12,6 @@ spec:
       labels:
         app: gam-manager
     spec:
-      imagePullSecrets:
-      - name: regcred
       containers:
       - name: gam-manager
         image: ghcr.io/skyhighsecurity/gamsk8s/gam-manager:latest

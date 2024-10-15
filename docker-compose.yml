@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   icap-listener:
-    image: icap-listener:latest
+    image: ghcr.io/skyhighsecurity/gamsk8s/icap-listener:latest
     build:
       context: ./containers/icap-listener
       dockerfile: Dockerfile
@@ -12,31 +12,39 @@ services:
     networks:
       - gam-network
 
-  gam-manager:
-    image: gam-manager:latest
-    build:
-      context: ./containers/gam-manager
-      dockerfile: Dockerfile
+  gam-manager-service:
+    image: ghcr.io/skyhighsecurity/gamsk8s/gam-manager:latest
+    container_name: gam-manager
+    restart: always
     ports:
-      - "500:8000"
+      - "5000:5000"
     environment:
-      - WORKER_SERVICE_URL=http://gam-worker:9000
+      - GAM_HOST=gam-worker-service
+      - GAM_PORT=8080
+      - GAM_USER=testing
+      - GAM_PASSWORD=testing
+      - GAM_MALWARE_THRESHOLD=60
+      - EXTRACT_PATH=/tmp/extracted_files
     volumes:
-      - gam-updates:/shared-storage
+      - /tmp/extracted_files:/tmp/extracted_files
     networks:
       - gam-network
 
+services:
   gam-worker:
-    image: gam-worker:latest
+    image: ghcr.io/skyhighsecurity/gamsk8s/gam-worker:latest
     build:
       context: ./containers/gam-worker
       dockerfile: Dockerfile
     ports:
-      - "9000:9000"
+      - "8080:8080"
     environment:
-      - LICENSE_PATH=/shared-storage/license.key
+      - AIRGAPPED="true"
+      - APIUSERNAME="testing"
+      - APIUSERPASSWORD="testing"
     volumes:
-      - gam-updates:/shared-storage
+      - /path/to/license/gam-product.conf:/gam/gam-product.conf
+      - /path/to/updates:/updates
     networks:
       - gam-network
 
