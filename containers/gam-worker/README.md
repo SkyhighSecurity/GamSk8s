@@ -16,12 +16,14 @@ This project exposes Skyhigh Gateway AntiMalware (GAM) services through a REST A
  - The server will periodically scan this folder and update using the highest numbered folder found
 
 ## Mount the persistent storage volume to the container
- - In docker, use -v /path/to/updates/folder:/app/updates
+ - In docker, use -v /path/to/updates/folder:/updates
  - The goal is to have the numbered folders in the container as:
-   - /app/updates/1
-   - /app/updates/2
+   - /updates/1
+   - /updates/2
    - etc.
 
+## Mount your license file (product.conf) at the following location:
+  /gam/gam-product.conf
 
 # Arguments
 ## Environment variables (-e)
@@ -43,7 +45,7 @@ docker run -d \
   -e APIUSERNAME=apiUser \
   -e APIUSERPASSWORD=apiPassword \
   -p 8080:8080 \
-  -v /path/to/updates/folder:/app/updates \
+  -v /path/to/updates/folder:/updates \
   --restart unless-stopped \
   registry1.dso.mil/skyhighsecurity/gam/gamapi/gamapi
 ```

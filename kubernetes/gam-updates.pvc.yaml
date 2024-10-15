@@ -8,4 +8,5 @@ spec:
   resources:
     requests:
       storage: 20Gi
-  storageClassName: oracle-fss
+  storageClassName: oracle-fss #or other block storage that supports RWX, see OCI/oracle-fss.sc.yaml
+

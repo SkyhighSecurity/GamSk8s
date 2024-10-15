@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gamapi-deployment
+  name: gam-worker-deployment
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: gamapi
+      app: gam-worker
   template:
     metadata:
       labels:
-        app: gamapi
+        app: gam-worker
     spec:
       imagePullSecrets:
       - name: regcred
       containers:
-      - name: gamapi
+      - name: gam-worker
         image: ghcr.io/skyhighsecurity/gamsk8s-gam:latest
         imagePullPolicy: Always
         volumeMounts:

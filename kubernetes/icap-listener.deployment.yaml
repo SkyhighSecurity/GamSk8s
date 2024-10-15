@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: icap-receiver
+  name: icap-listener
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: icap-receiver
+      app: icap-listener
   template:
     metadata:
       labels:
-        app: icap-receiver
+        app: icap-listener
     spec:
       imagePullSecrets:
       - name: regcred
       containers:
-      - name: icap-receiver
-        image: ghcr.io/skyhighsecurity/gamsk8s-icap:latest
+      - name: icap-listener
+        image: ghcr.io/skyhighsecurity/gamsk8s/icap-listener:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 1344
@@ -26,6 +26,6 @@ spec:
         - name: GAM_PASSWORD
           value: "testing"
         - name: GAM_MANAGER_HOST
-          value: "gam-manager"
+          value: "gam-manager-service"
         - name: GAM_MANAGER_PORT
           value: "5000"

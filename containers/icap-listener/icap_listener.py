@@ -12,8 +12,6 @@ GAM_MANAGER_HOST = os.getenv('GAM_MANAGER_HOST', 'localhost')
 GAM_MANAGER_PORT = os.getenv('GAM_MANAGER_PORT', '5000')
 GAM_MANAGER_URL = f"http://{GAM_MANAGER_HOST}:{GAM_MANAGER_PORT}/scan"
 
-TEMP_PATH = os.getenv('TEMP_PATH', '/tmp')
-
 # Set up basic logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -132,7 +130,7 @@ class ICAPHandler(BaseICAPRequestHandler):
             }
 
             # Stream the file to the backend
-            response = requests.post(GAM_MANAGER_URL, data=chunk_generator(), headers=headers, stream=True)
+            response = requests.post(GAM_MANAGER_URL, data=chunk_generator(), headers=headers, stream=True, timeout=6000)
             response.raise_for_status()  # Raise an exception for any HTTP errors
 
             # Log and parse the response

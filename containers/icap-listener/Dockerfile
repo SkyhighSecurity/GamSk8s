@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 1344
 
 # Run the ICAP service
-CMD ["python", "icap_frontend.py"]
+CMD ["python", "icap_listener.py"]

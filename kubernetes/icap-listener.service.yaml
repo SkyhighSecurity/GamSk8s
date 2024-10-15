@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: icap-listener-service
+  name: icap-listener-service
+  annotations:
+    service.beta.kubernetes.io/oci-load-balancer-connection-idle-timeout: "600" #or similar outside of OCI
+spec:
+  type: LoadBalancer
+  ports:
+    - name: "icap"
+      port: 1344
+  selector:
+    app: icap-listener

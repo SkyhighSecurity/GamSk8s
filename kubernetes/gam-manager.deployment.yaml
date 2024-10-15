@@ -16,13 +16,13 @@ spec:
       - name: regcred
       containers:
       - name: gam-manager
-        image: ghcr.io/skyhighsecurity/gamsk8s-manager:latest
+        image: ghcr.io/skyhighsecurity/gam-manager:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
         - name: GAM_HOST
-          value: "gamapi"
+          value: "gam-worker-service"
         - name: GAM_PORT
           value: "8080"
         - name: GAM_USER

@@ -1,5 +1,5 @@
 #!/bin/bash
-#Entrypoint startup script for GAMServer container
+#Entrypoint startup script for gam-worker container
 
 shopt -s nocasematch
 

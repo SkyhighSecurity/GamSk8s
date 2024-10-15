@@ -1,3 +1,5 @@
+#Modify to match your OCI environment
+
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:

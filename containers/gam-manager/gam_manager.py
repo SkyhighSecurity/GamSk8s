@@ -1,4 +1,3 @@
-
 import os
 import time
 import logging
@@ -23,9 +22,10 @@ app = Flask(__name__)
 GAM_HOST = os.getenv('GAM_HOST', 'localhost')
 GAM_PORT = os.getenv('GAM_PORT', '8080')
 GAM_BACKEND = f"http://{GAM_HOST}:{GAM_PORT}"
+GAM_WORKERS = os.getenv('GAM_WORKERS', 16)
 
 GAM_USER = os.getenv('GAM_USER', 'testing')
-GAM_PASSWORD = os.getenv('GAM_PASSWORD',  'testing')
+GAM_PASSWORD = os.getenv('GAM_PASSWORD', 'testing')
 GAM_AUTH = (GAM_USER, GAM_PASSWORD)
 
 GAM_MALWARE_THRESHOLD = int(os.getenv('GAM_MALWARE_THRESHOLD', 60))
@@ -41,7 +41,11 @@ def extract_archive(file_path, extract_to):
     extracted_files = []
 
     # Use magic to identify the file type based on content
-    file_type = magic.from_file(file_path, mime=True)
+    try:
+        file_type = magic.from_file(file_path, mime=True)
+    except Exception as e:
+        logging.error(f"Failed to identify file type: {e}")
+        return extracted_files, total_files, total_size
 
     # Handle ZIP files
     if file_type == 'application/zip':
@@ -67,14 +71,15 @@ def extract_archive(file_path, extract_to):
 
     return extracted_files, total_files, total_size
 
+# Utility function to encode content to base64
 def encode_base64(content):
-    """
-    Encodes the given content to base64 format.
-    """
     return base64.b64encode(content.encode('utf-8')).decode('utf-8')
 
 # Utility function to scan a file using the GAM backend
 def scan_file_with_gam(file_data, file_name):
+    logging.debug(f"GAM is scanning file: {file_name}")
+    #logging.debug(f"File content (base64 encoded): {base64.b64encode(file_data).decode('utf-8')}")
+
     source_url = f"http://0/file/{file_name}"
     encoded_source_url = encode_base64(source_url)
 
@@ -93,7 +98,8 @@ def scan_file_with_gam(file_data, file_name):
             data=encoder,
             headers=headers,
             auth=GAM_AUTH,
-            verify=False
+            verify=False,
+            timeout=6000
         )
         response.raise_for_status()
         return response.json()
@@ -103,19 +109,14 @@ def scan_file_with_gam(file_data, file_name):
 
 # Utility function to extract ISO files
 def extract_iso(iso, extract_to):
-    for dirpath, dirnames, filenames in os.walk(extract_to):
-        for file in filenames:
-            extracted_file = os.path.join(dirpath, file)
-            full_path = os.path.join(extract_to, extracted_file)
-            iso.get_file_from_iso(full_path)
+    for path in iso.list_children(iso_path='/'):
+        if path.is_file():
+            with open(os.path.join(extract_to, path.file_identifier()), 'wb') as f:
+                iso.get_file_from_iso_fp(fp=f, iso_path=path)
 
 # Route for streaming file upload and scanning
 @app.route('/scan', methods=['POST'])
 def scan_streaming():
-    '''
-    Handles streaming file uploads and scans them in chunks.
-    Ensures each request starts fresh and preserves the original filename.
-    '''
     infected_files = []
     file_name = None
     original_filename = None
@@ -128,6 +129,7 @@ def scan_streaming():
 
         # Get the uploaded file
         uploaded_file = request.files['file']
+        uploaded_file.stream.seek(0)
 
         # Preserve the original filename from the Content-Disposition header
         original_filename = uploaded_file.filename
@@ -144,8 +146,13 @@ def scan_streaming():
             file_name = temp_file.name
 
         # Detect the file type
-        file_type = magic.from_file(file_name, mime=True)
-        logging.info(f"Detected file type: {file_type}")
+        try:
+            file_type = magic.from_file(file_name, mime=True)
+            logging.info(f"Temporary file name: {file_name}")
+            logging.info(f"Detected file type: {file_type}")
+        except Exception as e:
+            logging.error(f"Failed to detect file type for file {file_name}: {e}")
+            return jsonify({"error": "Failed to detect file type"}), 500
 
         if file_type in ['application/zip', 'application/x-tar', 'application/x-7z-compressed', 'application/gzip', 'application/x-bzip2', 'application/x-xz']:
             logging.info(f"Extracting archive: {original_filename}")
@@ -154,10 +161,11 @@ def scan_streaming():
             extracted_files, total_files, total_size = extract_archive(file_name, EXTRACT_PATH)
             logging.info(f"Archive {original_filename} extracted to {total_files} files and {total_size} bytes.")
             logging.info(f"Extracted files: {extracted_files}")
+
             # Scan the extracted files in parallel using a ThreadPoolExecutor
-            with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=GAM_WORKERS) as executor:
                 future_to_file = {}
-                
+
                 for extracted_file in extracted_files:
                     extracted_file_path = os.path.join(EXTRACT_PATH, extracted_file)
                     extracted_file_name = os.path.basename(extracted_file)
@@ -167,11 +175,10 @@ def scan_streaming():
                         with open(extracted_file_path, 'rb') as f:
                             file_data = f.read()
 
-                        # Submit the task to the executor
-                        logging.info()
+                        # Submit the task to the executor, using a session for each task
                         future = executor.submit(scan_file_with_gam, file_data, extracted_file_name)
                         future_to_file[future] = extracted_file_name
-                    
+
                     except Exception as exc:
                         logging.error(f"Failed to open file {extracted_file_name}: {exc}")
 
@@ -182,22 +189,26 @@ def scan_streaming():
                     try:
                         scan_result = future.result()
                         logging.info(f"{extracted_file_name} result:{scan_result}")
-                        if 'malware' in scan_result and scan_result['malware']:
+                        if scan_result.get('MalwareName') and scan_result.get('MalwareProbability', 0) > GAM_MALWARE_THRESHOLD:
                             infected_files.append({
                                 'file': extracted_file_name,
                                 'malware_info': scan_result
                             })
-                            
-
                     except Exception as exc:
                         logging.error(f"File {extracted_file_name} generated an exception: {exc}")
 
         else:
             # If it's not an archive, scan the file directly
             logging.info(f"Scanning file: {original_filename}")
-            scan_result = scan_file_with_gam(uploaded_file.read(), original_filename)
+            uploaded_file.stream.seek(0) #the stream is empty if not seeked to 0 here, don't remove this.
+            file_data = uploaded_file.read()
+            if not file_data:
+                logging.error("File content is empty")
+                return jsonify({"error": "File content is empty"}), 400
+            scan_result = scan_file_with_gam(file_data, original_filename)
+            logging.info(f"{original_filename} result:{scan_result}")
 
-            if 'malware' in scan_result and scan_result['malware']:
+            if scan_result.get('MalwareName') and scan_result.get('MalwareProbability', 0) > GAM_MALWARE_THRESHOLD:
                 infected_files.append({
                     'file': original_filename,
                     'malware_info': scan_result
@@ -211,6 +222,10 @@ def scan_streaming():
     except Exception as e:
         logging.error(f"Error scanning file: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        if file_name and os.path.exists(file_name):
+            os.unlink(file_name)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
