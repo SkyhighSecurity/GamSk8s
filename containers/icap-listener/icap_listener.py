@@ -83,7 +83,7 @@ class ICAPHandler(BaseICAPRequestHandler):
         self.set_icap_header(b'Service', b'GAM Hyper-Scaler ICAP Service')
         self.set_icap_header(b'ISTag', b'GAM2019')
         self.set_icap_header(b'Max-Connections', b'100')
-        self.set_icap_header(b'Preview', b'2048')
+        #self.set_icap_header(b'Preview', b'2048') no preview support for now
         
         # Add Allow 204 support
         self.set_icap_header(b'Allow', b'204')
