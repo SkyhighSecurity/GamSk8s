@@ -142,6 +142,3 @@ If you'd like to contribute to this project, feel free to submit a pull request 
 
 For more information, please contact Nate Brady at nate.brady@skyhighsecurity.com.
 
----
-
-Let me know if you need further adjustments or additional sections for the README!
