@@ -58,7 +58,7 @@ The following ASCII diagram depicts how the components of GamSk8s interact to sc
 
 - Consists of the proprietary **Skyhigh Gateway AntiMalware (GAM)** engine.
 - Hosts a lightweight REST API that scans individual files.
-- Requires a valid license to run.
+- Requires a valid license from Skyhigh Security and agreement with the terms in containers/gam-worker/README.md
 
 ## Features
 
